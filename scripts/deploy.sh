@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the site to https://nfpmap.bdaic.ai (S3 bucket nfpmap.bdaic.ai behind CloudFront E307ZY8JYGD9DF).
+# Deploy the site to https://tnfpmap.bdaic.ai (S3 bucket nfpmap.bdaic.ai behind CloudFront E307ZY8JYGD9DF).
 #
 #   scripts/deploy.sh            # code from this working tree + data from s3://nfp-food-insecurity-map-data/current/
 #   scripts/deploy.sh --dry-run  # list what would be uploaded; change nothing
@@ -57,4 +57,4 @@ done
 if [ "$DRY" = "--dry-run" ]; then echo "dry run: nothing uploaded"; exit 0; fi
 aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths "/*" \
   --query 'Invalidation.Id' --output text | sed 's/^/invalidation /'
-echo "Deployed. Live at https://nfpmap.bdaic.ai within a few minutes."
+echo "Deployed. Live at https://tnfpmap.bdaic.ai within a few minutes."

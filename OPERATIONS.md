@@ -10,7 +10,7 @@ For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design
 
 | Piece | Where it lives | Who/what runs it |
 |---|---|---|
-| Static site (HTML/JS/Leaflet) | S3 bucket `nfpmap.bdaic.ai` (private) behind CloudFront `E307ZY8JYGD9DF` | Served at https://nfpmap.bdaic.ai; uploaded by `scripts/deploy.sh` |
+| Static site (HTML/JS/Leaflet) | S3 bucket `nfpmap.bdaic.ai` (private) behind CloudFront `E307ZY8JYGD9DF` | Served at https://tnfpmap.bdaic.ai; uploaded by `scripts/deploy.sh` |
 | Built data files (geojson/csv/parquet) | `s3://nfp-food-insecurity-map-data/current/` | `scripts/deploy.sh` copies the served ones (csv/geojson/json) into the site bucket |
 | Raw source data (Census ACS, CDC PLACES, USDA LILA, partner CSVs) | `s3://bdaic-public-transform/nfp-mapping/...` | Read by the Python pipeline |
 | Python data pipeline | Any machine with AWS creds — laptop, scheduled job, or EC2 | Invoked manually via `python -m pipeline`. Writes locally to `data/`, then the operator uploads to the output bucket |
@@ -18,7 +18,7 @@ For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design
 
 There is **no runtime backend**: CloudFront serves only the static HTML/JS and the pre-built `data/` files. The Python pipeline runs out of band; a deploy only copies its published output.
 
-**Production URL:** https://nfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21)
+**Production URL:** https://tnfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21; first published as `nfpmap.bdaic.ai`, which now redirects)
 
 ---
 
@@ -59,11 +59,12 @@ Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-i
 
 | Piece | Value |
 |---|---|
-| URL | https://nfpmap.bdaic.ai |
+| URL | https://tnfpmap.bdaic.ai |
+| Redirect | `nfpmap.bdaic.ai` → 301 → `tnfpmap.bdaic.ai` (same path and query), done by CloudFront Function `nfpmap-redirect` on viewer-request |
 | CloudFront | `E307ZY8JYGD9DF` (`d1jwmo9cga6oc3.cloudfront.net`): HTTPS only (HTTP redirects), HTTP/2+3, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`; unknown paths return the home page with status 404 |
-| Certificate | ACM `nfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
-| DNS | Route 53 A + AAAA alias `nfpmap.bdaic.ai` → the distribution |
-| Site bucket | `nfpmap.bdaic.ai`, readable only by the distribution |
+| Certificate | ACM `tnfpmap.bdaic.ai` + `nfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
+| DNS | Route 53 A + AAAA aliases for both names → the distribution |
+| Site bucket | `nfpmap.bdaic.ai` (keeps the first name; it's internal), readable only by the distribution |
 | Tags | `Project=nashville_food_project__food_insecurity_mapping_tool`, `Owner`, `Environment=prod`, `Client=tnfp` |
 
 ### 3.1 What gets served
