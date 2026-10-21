@@ -211,7 +211,12 @@ function initMap() {
     wheelPxPerZoomLevel: 120,
   });
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  // CARTO needs a key since 2026 (keyless tiles come back watermarked "API KEY REQUIRED").
+  // scripts/deploy.sh swaps the placeholder for the key in SSM /nfpmap/carto-basemap-key at deploy time,
+  // so the key never sits in git; a local preview keeps the placeholder and shows the watermark.
+  const CARTO_KEY = "__CARTO_BASEMAP_KEY__";
+  const cartoKey = CARTO_KEY.startsWith("__") ? "" : `?key=${CARTO_KEY}`;
+  L.tileLayer(`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${cartoKey}`, {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: "abcd",
     maxZoom: 19
