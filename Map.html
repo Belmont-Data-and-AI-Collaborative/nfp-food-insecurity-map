@@ -107,7 +107,7 @@
     .indicator-list { display: flex; flex-direction: column; gap: 2px; }
     .indicator-list .row {
       display: flex; align-items: center; gap: 8px; padding: 7px 8px;
-      border-radius: 6px; cursor: pointer; height: var(--density-row);
+      border-radius: 6px; cursor: pointer; min-height: var(--density-row);   /* grows when a label wraps */
     }
     .indicator-list .row:hover { background: var(--ink-100); }
     .indicator-list .row.on { background: var(--nfp-green-100); color: var(--nfp-green-900); font-weight: 500; }
@@ -121,7 +121,7 @@
     .partner-list, .gm-list { display: flex; flex-direction: column; gap: 2px; }
     .partner-list .row, .gm-list .row {
       display: flex; align-items: center; gap: 10px; padding: 5px 6px;
-      border-radius: 6px; cursor: pointer; height: var(--density-row);
+      border-radius: 6px; cursor: pointer; min-height: var(--density-row);   /* grows when a label wraps */
     }
     .partner-list .row:hover, .gm-list .row:hover { background: var(--ink-100); }
     .partner-list input, .gm-list input { accent-color: var(--nfp-green-700); margin: 0; }
@@ -142,7 +142,7 @@
       outline: none; border-color: var(--nfp-green-600);
       box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
     }
-    .search .ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--ink-400); width: 16px; height: 16px; }
+    .search .ico { position: absolute; left: 9px; top: 11px;   /* fixed to the input, not .search (which also holds the results) */ color: var(--ink-400); width: 16px; height: 16px; }
     .search-results {
       margin-top: 6px; max-height: 220px; overflow-y: auto; background: white;
       border: 1px solid var(--ink-200); border-radius: 6px; display: none;
@@ -202,7 +202,7 @@
       position: absolute;
       bottom: 24px; left: 14px;
       background: white; border: 1px solid var(--ink-200);
-      border-radius: 8px; padding: 12px 14px; min-width: 220px;
+      border-radius: 8px; padding: 12px 14px; min-width: 220px; max-width: 320px;
       box-shadow: var(--shadow); z-index: 400;
     }
     .legend-hd {
@@ -239,8 +239,8 @@
 
     /* Detail panel */
     .detail {
-      position: absolute; top: 14px; right: 14px; width: 340px;
-      max-height: calc(100% - 28px); background: white;
+      position: absolute; top: 58px; right: 14px; width: 340px;   /* below the Tweaks button */
+      max-height: calc(100% - 110px); background: white;   /* ends above the status bar */
       border: 1px solid var(--ink-200); border-radius: 10px;
       box-shadow: var(--shadow-lg); z-index: 410; overflow-y: auto; display: none;
     }
@@ -343,10 +343,15 @@
       font-family: var(--font-mono); font-size: 0.66rem;
       color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 4px;
     }
+    /* Tablets: a narrower sidebar leaves the map more room. */
+    @media (min-width: 761px) and (max-width: 1024px) {
+      .sidebar { width: 280px; }
+      .detail { width: 300px; }
+    }
     /* Phones: the sidebar and detail panel float over the map instead of squeezing it to nothing.
        The sidebar starts closed there (map.js, IS_PHONE); its toggle sits just right of it while open. */
     @media (max-width: 760px) {
-      .topnav .brand img { width: 80px !important; height: 36px !important; }
+      .topnav .brand img { height: 36px !important; width: auto !important; }
       .topnav .partner-lockup { display: none; }
       .sidebar {
         position: absolute; top: 0; bottom: 0; left: 0; z-index: 1100;   /* above Leaflet's controls (1000) */
@@ -355,6 +360,8 @@
       }
       .sidebar:not(.collapsed) ~ .map-wrap .panel-toggle { left: calc(min(340px, 100vw - 56px) + 8px); z-index: 1110; }
       .sidebar:not(.collapsed) ~ .map-wrap #panel-toggle-label { display: none; }
+      .sidebar:not(.collapsed) ~ .map-wrap .tweaks-toggle { display: none; }
+      .statusbar { display: none; }
       .detail { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 60%; z-index: 1050; }
       .legend { left: 8px; bottom: 24px; min-width: 0; max-width: calc(100% - 16px); padding: 10px 12px; }
       .tweaks-panel { right: 8px; max-width: calc(100% - 16px); }
@@ -372,7 +379,7 @@
 
 <nav class="topnav">
   <a class="brand" href="index.html">
-    <img src="assets/nfp-logo.png" alt="Nashville Food Project" style="width: 110px; height: 50px;" />
+    <img src="assets/nfp-logo.png" alt="Nashville Food Project" style="height: 50px; width: auto;" />
     <span>Food Insecurity Map</span>
   </a>
   <div class="links">
@@ -402,9 +409,9 @@
 
     <div class="sb-section">
       <div class="sb-title">Geography</div>
-      <div class="segmented" id="geo-toggle" role="tablist">
-        <button data-geo="tract" class="on">Census Tracts</button>
-        <button data-geo="zip">ZIP Codes</button>
+      <div class="segmented" id="geo-toggle" role="group" aria-label="Geography">
+        <button data-geo="tract" class="on" aria-pressed="true">Census Tracts</button>
+        <button data-geo="zip" aria-pressed="false">ZIP Codes</button>
       </div>
     </div>
 
@@ -494,7 +501,7 @@
           <div class="title" id="legend-eyebrow">Indicator</div>
           <div class="name" id="legend-name">—</div>
         </div>
-        <button class="legend-toggle" id="legend-toggle" title="Expand legend">
+        <button class="legend-toggle" id="legend-toggle" title="Collapse legend" aria-label="Collapse legend">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>

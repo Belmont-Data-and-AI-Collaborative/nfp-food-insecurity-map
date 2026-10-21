@@ -67,8 +67,10 @@ function applyConfig(cfg) {
 
 // ---------- State ----------
 // Phones: the sidebar covers the map there (Map.html @media), so it starts closed and closes again
-// after a search result is picked; the legend starts collapsed.
-const IS_PHONE = window.matchMedia("(max-width: 760px)").matches;
+// after a search result is picked; the legend starts collapsed. Re-applied when the window crosses
+// the breakpoint (rotation, resizing) in setupPhoneLayout().
+const PHONE_QUERY = window.matchMedia("(max-width: 760px)");
+let IS_PHONE = PHONE_QUERY.matches;
 
 const state = {
   geo: "tract",
@@ -646,6 +648,14 @@ function updateGmCount() {
 }
 
 // ---------- Legend ----------
+function setLegendExpanded(expanded) {
+  document.getElementById("legend").classList.toggle("expanded", expanded);
+  const t = document.getElementById("legend-toggle");
+  t.title = expanded ? "Collapse legend" : "Expand legend";
+  t.setAttribute("aria-label", t.title);
+  t.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
+
 function updateLegend() {
   const legend = document.getElementById("legend");
   if (!state.indicator) { legend.style.display = "none"; return; }
@@ -1022,7 +1032,10 @@ async function init() {
   document.querySelectorAll("#geo-toggle button").forEach(b => {
     b.addEventListener("click", () => {
       state.geo = b.dataset.geo;
-      document.querySelectorAll("#geo-toggle button").forEach(x => x.classList.toggle("on", x === b));
+      document.querySelectorAll("#geo-toggle button").forEach(x => {
+        x.classList.toggle("on", x === b);
+        x.setAttribute("aria-pressed", x === b ? "true" : "false");
+      });
       const ind = INDICATORS.find(i => i.id === state.indicator);
       if (ind && !ind.granularities.includes(state.geo)) {
         console.warn(`Indicator "${state.indicator}" unavailable for geo "${state.geo}"; switching to median_household_income`);
@@ -1054,14 +1067,14 @@ async function init() {
     applyPanels(state.panels === "hide" ? "show" : "hide");
   });
 
-  if (IS_PHONE) {
-    document.getElementById("legend").classList.remove("expanded");
-    document.getElementById("legend-toggle").title = "Expand legend";
-  }
+  setLegendExpanded(!IS_PHONE);
+  PHONE_QUERY.addEventListener("change", e => {
+    IS_PHONE = e.matches;
+    applyPanels(IS_PHONE ? "hide" : "show");
+    setLegendExpanded(!IS_PHONE);
+  });
   document.getElementById("legend-toggle").addEventListener("click", () => {
-    const legend = document.getElementById("legend");
-    const expanded = legend.classList.toggle("expanded");
-    document.getElementById("legend-toggle").title = expanded ? "Collapse legend" : "Expand legend";
+    setLegendExpanded(!document.getElementById("legend").classList.contains("expanded"));
   });
 
   document.getElementById("detail-close").addEventListener("click", () => {

@@ -112,6 +112,8 @@
       align-items: center;
       gap: 14px;
       justify-content: center;
+      flex-wrap: wrap;
+      text-align: center;
     }
     .footer img { height: 40px; }
 
@@ -120,6 +122,10 @@
       .stats { grid-template-columns: repeat(2, 1fr); }
       .nav-cards { grid-template-columns: 1fr; }
       .sources { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .footer { flex-direction: column; gap: 6px; }
+      .footer .mono { display: none; }
     }
   </style>
 </head>
