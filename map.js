@@ -66,6 +66,10 @@ function applyConfig(cfg) {
 }
 
 // ---------- State ----------
+// Phones: the sidebar covers the map there (Map.html @media), so it starts closed and closes again
+// after a search result is picked; the legend starts collapsed.
+const IS_PHONE = window.matchMedia("(max-width: 760px)").matches;
+
 const state = {
   geo: "tract",
   indicator: "lila_flag",
@@ -75,7 +79,7 @@ const state = {
   showGivingMatters: true,
   palette: (typeof TWEAK_DEFAULTS !== "undefined" && TWEAK_DEFAULTS.palette) || "greens",
   density: (typeof TWEAK_DEFAULTS !== "undefined" && TWEAK_DEFAULTS.density) || "compact",
-  panels: (typeof TWEAK_DEFAULTS !== "undefined" && TWEAK_DEFAULTS.panels) || "show",
+  panels: IS_PHONE ? "hide" : (typeof TWEAK_DEFAULTS !== "undefined" && TWEAK_DEFAULTS.panels) || "show",
   data: {
     tracts: null, zipcodes: null, counties: null,
     partners: null, givingMatters: null,
@@ -711,6 +715,7 @@ function setupSearch() {
     list.querySelectorAll(".item[data-i]").forEach(el => {
       el.addEventListener("click", () => {
         const r = results[parseInt(el.dataset.i)];
+        if (IS_PHONE) applyPanels("hide");
         if (r.coords) {
           map.flyTo([r.coords[1], r.coords[0]], 14, { duration: 0.6 });
         } else {
@@ -999,6 +1004,10 @@ async function init() {
     applyPanels(state.panels === "hide" ? "show" : "hide");
   });
 
+  if (IS_PHONE) {
+    document.getElementById("legend").classList.remove("expanded");
+    document.getElementById("legend-toggle").title = "Expand legend";
+  }
   document.getElementById("legend-toggle").addEventListener("click", () => {
     const legend = document.getElementById("legend");
     const expanded = legend.classList.toggle("expanded");
