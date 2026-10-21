@@ -15,14 +15,14 @@ DATA=s3://nfp-food-insecurity-map-data/current/
 DRY=${1:-}
 export AWS_REGION=us-east-1 AWS_PAGER=""
 
-if [ -n "$(git status --porcelain -- index.html Map.html About.html map.js styles.css favicon.ico assets)" ]; then
+if [ -n "$(git status --porcelain -- index.html Map.html About.html 404.html map.js home.js tweaks.js styles.css favicon.ico assets)" ]; then
   echo "warning: uncommitted changes in site files will be deployed" >&2
 fi
 
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/assets" "$STAGE/data"
-cp index.html Map.html About.html map.js styles.css favicon.ico "$STAGE/"
+cp index.html Map.html About.html 404.html map.js home.js tweaks.js styles.css favicon.ico "$STAGE/"
 # CARTO basemap key: kept in SSM, not git; inserted into the staged map.js only.
 CARTO_KEY=$(aws ssm get-parameter --name /nfpmap/carto-basemap-key --with-decryption --query Parameter.Value --output text)
 [ -n "$CARTO_KEY" ] || { echo "error: /nfpmap/carto-basemap-key is empty" >&2; exit 1; }
@@ -37,8 +37,8 @@ upload() {  # file key content-type cache-control
   if [ "$DRY" = "--dry-run" ]; then printf '  would upload %-34s %s\n' "$2" "$3"; return; fi
   aws s3 cp "$1" "s3://$BUCKET/$2" --only-show-errors --content-type "$3" --cache-control "$4"
 }
-for f in index.html Map.html About.html; do upload "$STAGE/$f" "$f" "text/html; charset=utf-8" "no-cache"; done
-upload "$STAGE/map.js" map.js "application/javascript; charset=utf-8" "no-cache"
+for f in index.html Map.html About.html 404.html; do upload "$STAGE/$f" "$f" "text/html; charset=utf-8" "no-cache"; done
+for f in map.js home.js tweaks.js; do upload "$STAGE/$f" "$f" "application/javascript; charset=utf-8" "no-cache"; done
 upload "$STAGE/styles.css" styles.css "text/css; charset=utf-8" "no-cache"
 upload "$STAGE/favicon.ico" favicon.ico image/x-icon "public, max-age=86400"
 for f in "$STAGE"/assets/*.png; do upload "$f" "assets/$(basename "$f")" image/png "public, max-age=86400"; done
