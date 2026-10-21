@@ -1,6 +1,6 @@
 # Operations Guide
 
-Practical reference for deploying, running, and handing off the NFP Food Insecurity Map. If you just want to hack on the code locally, [README.md](README.md) is enough. This document covers what's behind the deploy: S3 buckets, IAM, Vercel, and the out-of-band pipeline.
+Practical reference for deploying, running, and handing off the NFP Food Insecurity Map. If you just want to hack on the code locally, [README.md](README.md) is enough. This document covers what's behind the deploy: S3 buckets, CloudFront, IAM, and the out-of-band pipeline.
 
 For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design decisions (crosswalk math, geocoding semantics), see [ASSUMPTIONS.md](ASSUMPTIONS.md).
 
@@ -10,15 +10,15 @@ For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design
 
 | Piece | Where it lives | Who/what runs it |
 |---|---|---|
-| Static site (HTML/JS/Leaflet) | Vercel, project `nfp-food-insecurity-map` under team `databelmonts-projects` | Served from Vercel's CDN |
-| Built data files (geojson/csv/parquet) | `s3://nfp-food-insecurity-map-data/current/` | Vercel's build step downloads these via `scripts/sync-data.mjs` |
+| Static site (HTML/JS/Leaflet) | S3 bucket `nfpmap.bdaic.ai` (private) behind CloudFront `E307ZY8JYGD9DF` | Served at https://nfpmap.bdaic.ai; uploaded by `scripts/deploy.sh` |
+| Built data files (geojson/csv/parquet) | `s3://nfp-food-insecurity-map-data/current/` | `scripts/deploy.sh` copies the served ones (csv/geojson/json) into the site bucket |
 | Raw source data (Census ACS, CDC PLACES, USDA LILA, partner CSVs) | `s3://bdaic-public-transform/nfp-mapping/...` | Read by the Python pipeline |
 | Python data pipeline | Any machine with AWS creds — laptop, scheduled job, or EC2 | Invoked manually via `python -m pipeline`. Writes locally to `data/`, then the operator uploads to the output bucket |
 | Geocoding (partners only) | OpenStreetMap Nominatim (public API, no key) | Called from `pipeline/process_partners.py` during a pipeline run |
 
-There is **no runtime backend** — Vercel serves only the static HTML/JS and the pre-built `data/` files. The Python pipeline runs out of band and does not run during the Vercel build.
+There is **no runtime backend**: CloudFront serves only the static HTML/JS and the pre-built `data/` files. The Python pipeline runs out of band; a deploy only copies its published output.
 
-**Production URL:** https://nfp-food-insecurity-map-ecru.vercel.app
+**Production URL:** https://nfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21)
 
 ---
 
@@ -29,7 +29,8 @@ There is **no runtime backend** — Vercel serves only the static HTML/JS and th
 | Bucket | Purpose | Access pattern |
 |---|---|---|
 | `bdaic-public-transform` | **SOURCE** — raw inputs shared with other Belmont data projects. Under the `nfp-mapping/` prefix: partner CSVs, geocode caches. Census/PLACES/LILA live at their own prefixes (see `s3_prefix:` entries in [project.yml](project.yml)). | Pipeline reads. Do NOT delete or rename. |
-| `nfp-food-insecurity-map-data` | **OUTPUT** — dedicated to this project. Served files live under `current/`. | Pipeline writes; Vercel reads. |
+| `nfp-food-insecurity-map-data` | **OUTPUT** — dedicated to this project. Published files live under `current/`. | Pipeline writes; `scripts/deploy.sh` reads. |
+| `nfpmap.bdaic.ai` | **SITE** — what CloudFront serves. Private (public access blocked); only CloudFront `E307ZY8JYGD9DF` can read it (origin access control). Versioned, encrypted. | `scripts/deploy.sh` writes. |
 
 The `current/` prefix exists so peer prefixes can be added without disrupting the live deploy:
 - `archive/<YYYY-MM-DD>/` — optional point-in-time snapshots before a pipeline rerun (none created yet).
@@ -47,129 +48,46 @@ Used when a human (or scheduled job) runs `python -m pipeline` and then uploads 
 
 Today these are the operator's own IAM user keys in `~/.aws/credentials`. If a scheduled job takes over, create a dedicated IAM user for it.
 
-**b) Vercel build credentials**
-Used only by `scripts/sync-data.mjs` during the Vercel build. Read-only on `nfp-food-insecurity-map-data/current/`.
+**b) Deploy credentials**
+Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-insecurity-map-data/current/`, `s3:PutObject` on `nfpmap.bdaic.ai`, and `cloudfront:CreateInvalidation` on distribution `E307ZY8JYGD9DF`. Today that's a BDAIC admin's own credentials; no long-lived key is stored anywhere for deploys.
 
-**Current state:** Dedicated IAM user `nfp-map-vercel-reader` (account `324727022201`), created 2026-04-23. No console access, no group membership. Single inline policy `NfpMapVercelS3Read`:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ListBucketCurrentPrefix",
-      "Effect": "Allow",
-      "Action": ["s3:ListBucket"],
-      "Resource": "arn:aws:s3:::nfp-food-insecurity-map-data",
-      "Condition": {"StringLike": {"s3:prefix": ["current/*", "current/"]}}
-    },
-    {
-      "Sid": "GetObjectsInCurrentPrefix",
-      "Effect": "Allow",
-      "Action": ["s3:GetObject"],
-      "Resource": "arn:aws:s3:::nfp-food-insecurity-map-data/current/*"
-    }
-  ]
-}
-```
-
-**History:** Before 2026-04-23 the Vercel build was using the operator's personal admin keys (`pranish.bhagat`, member of the `Administrators` group). That gave the build full S3 + admin-wide access for a read-only job. The dedicated user replaced it.
-
-**Verify the user's current state:**
-```bash
-aws iam get-user --user-name nfp-map-vercel-reader
-aws iam get-user-policy --user-name nfp-map-vercel-reader --policy-name NfpMapVercelS3Read
-aws iam list-access-keys --user-name nfp-map-vercel-reader
-```
-
-### 2.3 Rotating the Vercel credentials
-
-Rotate at least annually, or immediately on suspected compromise. AWS allows two active access keys per user, so you can stage the new key before removing the old one.
-
-```bash
-# 1. Create a second access key on the same user (JSON output — capture it!)
-aws iam create-access-key --user-name nfp-map-vercel-reader > new-key.json
-
-# 2. Update Vercel env vars. IMPORTANT: pipe values via file to avoid a
-#    trailing newline corrupting the stored secret. Do NOT use `echo` without -n.
-vercel env rm AWS_ACCESS_KEY_ID production --scope databelmonts-projects --yes
-vercel env rm AWS_SECRET_ACCESS_KEY production --scope databelmonts-projects --yes
-
-printf '%s' "$(jq -r .AccessKey.AccessKeyId new-key.json)" \
-  | vercel env add AWS_ACCESS_KEY_ID production --scope databelmonts-projects
-printf '%s' "$(jq -r .AccessKey.SecretAccessKey new-key.json)" \
-  | vercel env add AWS_SECRET_ACCESS_KEY production --scope databelmonts-projects
-
-# 3. Redeploy and confirm the build succeeds
-vercel --prod --scope databelmonts-projects
-
-# 4. After the new key is confirmed working, disable and then delete the old one
-aws iam update-access-key --user-name nfp-map-vercel-reader --access-key-id <OLD_AKIA> --status Inactive
-# wait a day or two to make sure nothing else breaks, then:
-aws iam delete-access-key --user-name nfp-map-vercel-reader --access-key-id <OLD_AKIA>
-
-# 5. Shred the temp file
-shred -u new-key.json    # or rm on macOS
-```
-
-**Gotcha we hit once:** Piping a secret to `vercel env add` via `echo "$v"` or Python `input=val+"\n"` embeds the trailing newline into the stored value, which the AWS SDK then passes to the Authorization header — the build fails with `ERR_INVALID_CHAR: Invalid character in header content ["authorization"]`. Use `printf '%s'` (no `-n` needed — `%s` doesn't append newline) or pipe from a file written with no trailing newline.
+**Retired 2026-10-21:** the Vercel build user `nfp-map-vercel-reader` (its key was deactivated 2026-09-29) and its Vercel env vars, along with Vercel itself.
 
 ---
 
-## 3. Vercel setup
+## 3. Hosting (AWS)
 
-**Project:** `nfp-food-insecurity-map`
-**Team:** `databelmonts-projects` (ID `team_AakWrNVJWWsQjEPgWlPMqXD6`)
-**Repo is linked** via `.vercel/project.json` (gitignored). If you clone fresh, either run `vercel link` or copy that file.
-
-### 3.1 Build configuration
-
-From [vercel.json](vercel.json):
-```json
-{
-  "buildCommand": "npm install @aws-sdk/client-s3 && node scripts/sync-data.mjs",
-  "installCommand": "",
-  "outputDirectory": "."
-}
-```
-
-Each build installs `@aws-sdk/client-s3` fresh (no `package.json` lockfile — noted as a gap in §6). Then `scripts/sync-data.mjs` downloads every object from `s3://nfp-food-insecurity-map-data/current/` into local `data/`. Vercel then serves the repo root as static files.
-
-### 3.2 Environment variables (Production only)
-
-| Name | Purpose |
+| Piece | Value |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | Vercel build credentials (read-only on output bucket) |
-| `AWS_SECRET_ACCESS_KEY` | paired secret |
-| `AWS_DEFAULT_REGION` | `us-east-1` |
+| URL | https://nfpmap.bdaic.ai |
+| CloudFront | `E307ZY8JYGD9DF` (`d1jwmo9cga6oc3.cloudfront.net`): HTTPS only (HTTP redirects), HTTP/2+3, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`; unknown paths return the home page with status 404 |
+| Certificate | ACM `nfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
+| DNS | Route 53 A + AAAA alias `nfpmap.bdaic.ai` → the distribution |
+| Site bucket | `nfpmap.bdaic.ai`, readable only by the distribution |
+| Tags | `Project=nashville_food_project__food_insecurity_mapping_tool`, `Owner`, `Environment=prod`, `Client=tnfp` |
 
-List them with:
+### 3.1 What gets served
+
+`scripts/deploy.sh` stages exactly what the site loads: the three pages, `map.js`, `styles.css`, the two logos, `data/last_updated.txt` from the repo, and the csv/geojson/json files from `s3://nfp-food-insecurity-map-data/current/` (parquet files are pipeline-only and are not uploaded). Each file gets an explicit content type; pages, JS and CSS are `no-cache`, data is cached for an hour, logos for a day.
+
+### 3.2 Deploying
+
+Deploys are **intentionally manual**: nothing deploys on push. Commit and push to `main` first so git and production stay aligned.
+
 ```bash
-vercel env ls production --scope databelmonts-projects
+git push origin main
+scripts/deploy.sh --dry-run    # list what would be uploaded
+scripts/deploy.sh              # upload + CloudFront invalidation; live within a few minutes
 ```
 
-### 3.3 Deploying
+The site's code comes from your working tree, and its data always comes from the bucket's `current/` prefix, so a code-only deploy can't accidentally ship unpublished local data.
 
-Deploys are **intentionally manual** — GitHub auto-deploy is deliberately not wired. The operator controls exactly what and when goes to prod. Always commit and push to `main` before deploying so git and prod stay aligned.
-
-- **Normal deploy:**
-  ```bash
-  git push origin main                              # get main in sync
-  vercel --prod --scope databelmonts-projects       # deploy the working tree
-  ```
-  `vercel --prod` uploads the working tree (not GitHub), so if you've made local changes that aren't committed, they will deploy. Push first unless you're consciously hot-fixing uncommitted work.
-
-- **Data change only (pipeline rerun):**
-  ```bash
-  python -m pipeline
-  aws s3 sync data/ s3://nfp-food-insecurity-map-data/current/ --exclude "mock/*"
-  vercel --prod --scope databelmonts-projects
-  ```
-  Vercel won't detect new S3 files on its own — the redeploy is what triggers `sync-data.mjs` to pull the new objects.
-
-- **CLI gotcha:** `vercel link --yes` can fail in non-interactive mode with "missing_scope" even when `--scope` is passed. Workaround: write `.vercel/project.json` manually using `projectId` from `GET https://api.vercel.com/v9/projects/<name>?teamId=<id>`.
-
-- **If you ever want to reconsider auto-deploy:** it's a dashboard-only flow (Vercel → Project → Settings → Git → Connect). The Vercel GitHub App would need installing on the `Belmont-Data-Collaborative` org with access to this repo. Tradeoff: every push to `main` deploys, which is convenient but means small doc commits also build. We've opted against it for now.
+**Data change only (pipeline rerun):**
+```bash
+python -m pipeline
+aws s3 sync data/ s3://nfp-food-insecurity-map-data/current/ --exclude "mock/*"
+scripts/deploy.sh
+```
 
 ---
 
@@ -198,7 +116,7 @@ After the pipeline succeeds:
 aws s3 sync data/ s3://nfp-food-insecurity-map-data/current/ --exclude "mock/*"
 ```
 
-Then redeploy Vercel (§3.3).
+Then run `scripts/deploy.sh` (§3.2).
 
 ### 4.3 Local-only (mock mode)
 
@@ -211,16 +129,14 @@ Then redeploy Vercel (§3.3).
 ### 5.1 "The site is showing old data"
 
 1. Check when the pipeline was last run — look at the modified-timestamp of any file in `s3://nfp-food-insecurity-map-data/current/` with `aws s3 ls`.
-2. If the S3 files are fresh but Vercel shows old data: Vercel didn't rebuild. Redeploy with `vercel --prod --scope databelmonts-projects`.
+2. If the S3 files are fresh but the site shows old data: the site bucket wasn't redeployed. Run `scripts/deploy.sh` (it also clears CloudFront's cache).
 3. If the S3 files are stale: rerun the pipeline (§4.1), upload (§4.2), redeploy.
 
-### 5.2 "Vercel build is failing with S3 errors"
+### 5.2 "The deploy script fails"
 
-Likely causes, in order of likelihood:
-1. **Missing or wrong env vars.** `vercel env ls production --scope databelmonts-projects` — all three AWS vars should be present.
-2. **IAM policy too narrow.** The build user needs `s3:ListBucket` on the bucket AND `s3:GetObject` on the `current/` prefix. A 403 in the build log points here.
-3. **Wrong bucket or prefix.** `scripts/sync-data.mjs:10-11` is hardcoded — double-check against the actual S3 layout.
-4. **AWS region mismatch.** If the bucket is not in `us-east-1`, update `AWS_DEFAULT_REGION` on Vercel.
+1. **`AccessDenied` on the data bucket or the site bucket:** your credentials lack the permissions in §2.2 (b).
+2. **`AccessDenied` on `CreateInvalidation`:** the upload succeeded but the cache wasn't cleared; the site updates once cached copies expire (up to an hour for data), or rerun with the right credentials.
+3. **Site shows XML "AccessDenied" instead of a page:** the bucket policy no longer names the distribution. It must allow `cloudfront.amazonaws.com` `s3:GetObject` on `nfpmap.bdaic.ai/*` with `AWS:SourceArn` = distribution `E307ZY8JYGD9DF`.
 
 ### 5.3 "A partner is missing from the map"
 
@@ -254,14 +170,13 @@ None of these block production, but they are the load-bearing items the next ope
 
 2. **No CI.** There is no `.github/workflows/`. Tests exist (`pytest tests/ -v`) but nobody runs them automatically. Adding a PR-level workflow that runs pytest + lint is ~30 minutes of work.
 
-3. **No `package.json` / lockfile for Vercel build.** [vercel.json](vercel.json) runs `npm install @aws-sdk/client-s3` with no version pin — each build pulls whatever's latest. Low-probability breakage but not reproducible. Fix: commit a minimal `package.json` with a pinned SDK version and a `package-lock.json`.
+3. **Pipeline is manual.** Out-of-band operator runs. A scheduled GitHub Action (weekly?) that does `python -m pipeline && aws s3 sync ...` would close the loop. README "Next steps" lists this already.
 
-4. **`sync-data.mjs` streams directly to the target path.** If a download fails mid-stream, the partial file sits where the frontend would `fetch()` it. Low-probability (Vercel retries builds that exit non-zero), but writing to a temp file and renaming on success is a one-line fix.
-
-5. **Pipeline is manual.** Out-of-band operator runs. A scheduled GitHub Action (weekly?) that does `python -m pipeline && aws s3 sync ...` would close the loop. README "Next steps" lists this already.
+**Resolved** (2026-10-21):
+- Hosting moved from Vercel to S3 + CloudFront at https://nfpmap.bdaic.ai. That retires the unpinned `npm install` build and `sync-data.mjs`'s partial-download risk (both gaps were Vercel-build only).
 
 **Resolved** (2026-04-23):
-- Vercel build now uses a dedicated least-privilege IAM user (`nfp-map-vercel-reader`) instead of the operator's admin keys — see §2.2.
+- Vercel build used a dedicated least-privilege IAM user (`nfp-map-vercel-reader`) instead of the operator's admin keys (retired with Vercel on 2026-10-21).
 - S3 versioning is enabled on `nfp-food-insecurity-map-data` — accidental `rm` is now recoverable via delete-marker cleanup (see §5.5).
 
 ---
@@ -269,11 +184,9 @@ None of these block production, but they are the load-bearing items the next ope
 ## 7. Onboarding checklist for a new engineer
 
 - [ ] Clone the repo, read [README.md](README.md) + [CLAUDE.md](CLAUDE.md) + this doc.
-- [ ] Get added to the `databelmonts-projects` Vercel team (ask current owner).
-- [ ] Get AWS pipeline-operator credentials (ask current owner) with access to both buckets.
-- [ ] Install Vercel CLI: `npm i -g vercel`, then `vercel login`.
+- [ ] Get AWS credentials (ask current owner): pipeline-operator access to both data buckets, plus deploy access (§2.2 b) if you'll ship changes.
 - [ ] Run the pipeline once in mock mode (`USE_MOCK_DATA=true`) to verify local setup.
 - [ ] Run the pipeline once against real S3 to verify AWS creds work end-to-end.
-- [ ] Do a no-op `vercel --prod --scope databelmonts-projects` to verify deploy access.
+- [ ] Run `scripts/deploy.sh --dry-run` to verify read access to the published data.
 - [ ] Read through `pipeline/__main__.py` and one source module (e.g. `pipeline/process_census_acs.py`) to understand the step pattern.
 - [ ] Read `map.js` top-to-bottom once — it's ~1k lines and is the single frontend file.
