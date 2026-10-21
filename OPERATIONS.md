@@ -49,7 +49,7 @@ Used when a human (or scheduled job) runs `python -m pipeline` and then uploads 
 Today these are the operator's own IAM user keys in `~/.aws/credentials`. If a scheduled job takes over, create a dedicated IAM user for it.
 
 **b) Deploy credentials**
-Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-insecurity-map-data/current/`, `s3:PutObject` on `nfpmap.bdaic.ai`, and `cloudfront:CreateInvalidation` on distribution `E307ZY8JYGD9DF`. Today that's a BDAIC admin's own credentials; no long-lived key is stored anywhere for deploys.
+Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-insecurity-map-data/current/`, `s3:PutObject` on `nfpmap.bdaic.ai`, `cloudfront:CreateInvalidation` on distribution `E307ZY8JYGD9DF`, and `ssm:GetParameter` (with decryption) on `/nfpmap/carto-basemap-key`. Today that's a BDAIC admin's own credentials; no long-lived key is stored anywhere for deploys.
 
 **Retired 2026-10-21:** the Vercel build user `nfp-map-vercel-reader` (its key was deactivated 2026-09-29) and its Vercel env vars, along with Vercel itself.
 
@@ -68,7 +68,7 @@ Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-i
 
 ### 3.1 What gets served
 
-`scripts/deploy.sh` stages exactly what the site loads: the three pages, `map.js`, `styles.css`, the two logos, `data/last_updated.txt` from the repo, and the csv/geojson/json files from `s3://nfp-food-insecurity-map-data/current/` (parquet files are pipeline-only and are not uploaded). Each file gets an explicit content type; pages, JS and CSS are `no-cache`, data is cached for an hour, logos for a day.
+`scripts/deploy.sh` stages exactly what the site loads: the three pages, `map.js`, `styles.css`, the two logos, `data/last_updated.txt` from the repo, and the csv/geojson/json files from `s3://nfp-food-insecurity-map-data/current/` (parquet files are pipeline-only and are not uploaded). It also inserts the CARTO basemap key (SSM SecureString `/nfpmap/carto-basemap-key`, requested 2026-10-21 under data@belmont.edu) into the staged `map.js`: CARTO watermarks keyless tiles, and keeping the key out of git honours CARTO's "don't share your key" term. A local preview has no key and shows the watermark. Each file gets an explicit content type; pages, JS and CSS are `no-cache`, data is cached for an hour, logos for a day.
 
 ### 3.2 Deploying
 

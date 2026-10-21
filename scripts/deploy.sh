@@ -23,6 +23,11 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/assets" "$STAGE/data"
 cp index.html Map.html About.html map.js styles.css "$STAGE/"
+# CARTO basemap key: kept in SSM, not git; inserted into the staged map.js only.
+CARTO_KEY=$(aws ssm get-parameter --name /nfpmap/carto-basemap-key --with-decryption --query Parameter.Value --output text)
+[ -n "$CARTO_KEY" ] || { echo "error: /nfpmap/carto-basemap-key is empty" >&2; exit 1; }
+sed -i.bak "s/__CARTO_BASEMAP_KEY__/${CARTO_KEY}/" "$STAGE/map.js" && rm "$STAGE/map.js.bak"
+grep -q "__CARTO_BASEMAP_KEY__" "$STAGE/map.js" && { echo "error: CARTO key not inserted into map.js" >&2; exit 1; }
 cp assets/bdaic-logo.png assets/nfp-logo.png "$STAGE/assets/"
 cp data/last_updated.txt "$STAGE/data/"
 # The served data is the pipeline's published output, not whatever is in local data/.
