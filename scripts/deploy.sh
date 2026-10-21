@@ -43,7 +43,9 @@ upload "$STAGE/styles.css" styles.css "text/css; charset=utf-8" "no-cache"
 for f in "$STAGE"/assets/*.png; do upload "$f" "assets/$(basename "$f")" image/png "public, max-age=86400"; done
 for f in "$STAGE"/data/*; do
   case "$f" in
-    *.geojson) ct="application/geo+json" ;;
+    # CloudFront only compresses listed types and application/geo+json is not one of them: as geo+json the
+    # boundary files shipped uncompressed (~15 MB vs ~3.7 MB brotli). The map reads them with fetch().json().
+    *.geojson) ct="application/json" ;;
     *.json)    ct="application/json" ;;
     *.csv)     ct="text/csv; charset=utf-8" ;;
     *.txt)     ct="text/plain; charset=utf-8" ;;
