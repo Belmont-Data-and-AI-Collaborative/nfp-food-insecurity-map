@@ -18,7 +18,7 @@ For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design
 
 There is **no runtime backend**: CloudFront serves only the static HTML/JS and the pre-built `data/` files. The Python pipeline runs out of band; a deploy only copies its published output.
 
-**Production URL:** https://tnfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21; first published as `nfpmap.bdaic.ai`, which now redirects)
+**Production URL:** https://tnfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21; first published as `nfpmap.bdaic.ai`, retired the same day: no DNS, no alias, no redirect)
 
 ---
 
@@ -60,16 +60,16 @@ Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-i
 | Piece | Value |
 |---|---|
 | URL | https://tnfpmap.bdaic.ai |
-| Redirect | `nfpmap.bdaic.ai` → 301 → `tnfpmap.bdaic.ai` (same path and query), done by CloudFront Function `nfpmap-redirect` on viewer-request |
-| CloudFront | `E307ZY8JYGD9DF` (`d1jwmo9cga6oc3.cloudfront.net`): HTTPS only (HTTP redirects), HTTP/2+3, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`; unknown paths return the home page with status 404 |
-| Certificate | ACM `tnfpmap.bdaic.ai` + `nfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
-| DNS | Route 53 A + AAAA aliases for both names → the distribution |
+| Old name | `nfpmap.bdaic.ai` retired 2026-10-21: alias, CloudFront Function `nfpmap-redirect`, DNS records and its certificate deleted. Links to it fail to resolve. |
+| CloudFront | `E307ZY8JYGD9DF` (`d1jwmo9cga6oc3.cloudfront.net`): HTTPS only (HTTP redirects), HTTP/2+3, compression, `Managed-CachingOptimized`, response headers policy `nfpmap-security-headers` (`3bcf434b-…`: HSTS, nosniff, X-Frame-Options SAMEORIGIN, referrer policy, Content-Security-Policy); missing paths (S3 answers 403) return `/404.html` with status 404. Set up by `bdaic-my-agent/docs/nfpmap-2026-10-21/headers-and-404.sh` |
+| Certificate | ACM `tnfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
+| DNS | Route 53 A + AAAA aliases for `tnfpmap.bdaic.ai` → the distribution |
 | Site bucket | `nfpmap.bdaic.ai` (keeps the first name; it's internal), readable only by the distribution |
 | Tags | `Project=nashville_food_project__food_insecurity_mapping_tool`, `Owner`, `Environment=prod`, `Client=tnfp` |
 
 ### 3.1 What gets served
 
-`scripts/deploy.sh` stages exactly what the site loads: the three pages, `map.js`, `styles.css`, the two logos, `data/last_updated.txt` from the repo, and the csv/geojson/json files from `s3://nfp-food-insecurity-map-data/current/` (parquet files are pipeline-only and are not uploaded). It also inserts the CARTO basemap key (SSM SecureString `/nfpmap/carto-basemap-key`, requested 2026-10-21 under data@belmont.edu) into the staged `map.js`: CARTO watermarks keyless tiles, and keeping the key out of git honours CARTO's "don't share your key" term. A local preview has no key and shows the watermark. Each file gets an explicit content type; pages, JS and CSS are `no-cache`, data is cached for an hour, logos for a day.
+`scripts/deploy.sh` stages exactly what the site loads: the four pages (`index.html`, `Map.html`, `About.html`, `404.html`), `map.js`, `home.js`, `tweaks.js`, `styles.css`, `favicon.ico`, `assets/*.png|*.jpg` (logos, apple-touch-icon, link-preview image), `data/last_updated.txt` from the repo, and the csv/geojson/json files from `s3://nfp-food-insecurity-map-data/current/` (parquet files are pipeline-only and are not uploaded). It also inserts the CARTO basemap key (SSM SecureString `/nfpmap/carto-basemap-key`, requested 2026-10-21 under data@belmont.edu) into the staged `map.js`: CARTO watermarks keyless tiles, and keeping the key out of git honours CARTO's "don't share your key" term. A local preview has no key and shows the watermark. Each file gets an explicit content type; pages, JS and CSS are `no-cache`, data is cached for an hour, logos for a day.
 
 ### 3.2 Deploying
 

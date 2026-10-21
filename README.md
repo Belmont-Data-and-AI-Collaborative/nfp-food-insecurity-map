@@ -47,7 +47,7 @@ Each source also has a `--step` flag: `python -m pipeline --step census_acs` etc
 
 ## Deployment
 
-Live at **https://tnfpmap.bdaic.ai** (`nfpmap.bdaic.ai` redirects there): a private S3 bucket (`nfpmap.bdaic.ai`) behind CloudFront (`E307ZY8JYGD9DF`) in BDAIC's AWS account. Moved from Vercel (`nfp-food-insecurity-map-ecru.vercel.app`) on 2026-10-21; [OPERATIONS.md](OPERATIONS.md) §3 has the details.
+Live at **https://tnfpmap.bdaic.ai** (the first name, `nfpmap.bdaic.ai`, was retired the same day and no longer resolves): a private S3 bucket (`nfpmap.bdaic.ai`) behind CloudFront (`E307ZY8JYGD9DF`) in BDAIC's AWS account. Moved from Vercel (`nfp-food-insecurity-map-ecru.vercel.app`) on 2026-10-21; [OPERATIONS.md](OPERATIONS.md) §3 has the details.
 
 ### How it works
 
