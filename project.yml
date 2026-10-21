@@ -173,9 +173,10 @@ data_sources:
         layer_type: categorical
         data_year: "2019"
         caption: >
-          USDA designation: tract where ≥500 residents (or ≥33% of population)
-          live >1 mile from a supermarket AND tract median income ≤80% of
-          area median. Urban thresholds; rural uses 10-mile cutoff.
+          USDA designation: a low-income tract (poverty rate ≥20%, or median
+          family income ≤80% of the statewide or metro-area median) where ≥500
+          residents or ≥33% of the population live more than 1 mile (urban) or
+          10 miles (rural) from the nearest supermarket.
           Source: USDA ERS Food Access Research Atlas, 2019.
         categories:
           0: "Not LILA"
@@ -191,8 +192,9 @@ data_sources:
         default_visible: false
         data_year: "2019"
         caption: >
-          Number of residents living more than 1 mile (urban) or 10 miles
-          (rural) from the nearest supermarket, regardless of income level.
+          Number of residents living more than 1 mile from the nearest
+          supermarket, regardless of income (USDA's 1-mile measure, applied to
+          urban and rural tracts alike).
           Source: USDA ERS Food Access Research Atlas, 2019.
       - id: lalowi1
         column: lalowi1
@@ -205,9 +207,9 @@ data_sources:
         default_visible: false
         data_year: "2019"
         caption: >
-          Low-income residents (HH income ≤80% of area median) who also live
-          more than 1 mile (urban) or 10 miles (rural) from the nearest
-          supermarket. Source: USDA ERS Food Access Research Atlas, 2019.
+          Low-income residents (income at or below 200% of the federal poverty
+          level) who live more than 1 mile from the nearest supermarket.
+          Source: USDA ERS Food Access Research Atlas, 2019.
 
   food_insecurity_index:
     source_type: computed   # computed in-process by pipeline/process_food_insecurity.py
