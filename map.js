@@ -343,9 +343,9 @@ function pointToMarker(f, theme) {
   const name = p.partner_name || p.name || "Organization";
   const affiliation = theme === "nfp" ? "TNFP Partner" : "Giving Matters";
   marker.bindPopup(`
-    <div class="tt-title">${name}</div>
-    <div style="font-size:0.78rem;color:var(--ink-500);margin-bottom:6px;">${p.address || ""}</div>
-    <div class="tt-row"><span class="k">Category</span><span class="v" style="color:${meta.color}">${meta.label}</span></div>
+    <div class="tt-title">${escapeHtml(name)}</div>
+    <div style="font-size:0.78rem;color:var(--ink-500);margin-bottom:6px;">${escapeHtml(p.address)}</div>
+    <div class="tt-row"><span class="k">Category</span><span class="v" style="color:${meta.color}">${escapeHtml(meta.label)}</span></div>
     <div class="tt-row"><span class="k">Source</span><span class="v">${affiliation}</span></div>
   `);
   return marker;
@@ -442,7 +442,7 @@ function openFeatureDetail(f, layer) {
         const meta = PARTNER_TYPES[n.type] || PARTNER_TYPES.other;
         return `<div class="p" data-lng="${n.lng}" data-lat="${n.lat}">
           <div class="dot" style="background:${meta.color}"></div>
-          <div class="n">${n.name}</div>
+          <div class="n">${escapeHtml(n.name)}</div>
           <div class="d">${n.dist.toFixed(1)} mi</div>
         </div>`;
       }).join("")}
@@ -453,6 +453,7 @@ function openFeatureDetail(f, layer) {
     `<h4>Identifier</h4><div class="mono" style="color:var(--ink-600);">${geoid}</div>`;
 
   body.querySelectorAll(".partners-near .p").forEach(el => {
+    makeKeyboardClickable(el);
     el.addEventListener("click", () => {
       map.flyTo([parseFloat(el.dataset.lat), parseFloat(el.dataset.lng)], 14, { duration: 0.6 });
     });
@@ -479,6 +480,20 @@ function tractCountyName(geoid) {
   return counties[prefix] ? counties[prefix] + " County" : "Nashville MSA";
 }
 
+// Data strings (names, addresses, labels) and the search text go into innerHTML templates; escape them.
+function escapeHtml(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Clickable divs (layer rows, search results, nearby partners, palettes): reachable by Tab, activated by Enter/Space.
+function makeKeyboardClickable(el) {
+  el.setAttribute("tabindex", "0");
+  if (!el.hasAttribute("role")) el.setAttribute("role", "button");
+  el.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); }
+  });
+}
+
 function featureCentroid(f) {
   const g = f.geometry;
   if (!g) return null;
@@ -487,7 +502,9 @@ function featureCentroid(f) {
     if (typeof coords[0] === "number") pts.push(coords);
     else coords.forEach(walk);
   }
-  walk(g.coordinates);
+  // 26 ZCTAs are GeometryCollections (no .coordinates of their own); walk their parts.
+  (g.type === "GeometryCollection" ? g.geometries : [g]).forEach(part => { if (part && part.coordinates) walk(part.coordinates); });
+  if (!pts.length) return null;
   let sx = 0, sy = 0;
   for (const p of pts) { sx += p[0]; sy += p[1]; }
   return [sx / pts.length, sy / pts.length];
@@ -525,17 +542,19 @@ function renderIndicatorList() {
   el.innerHTML = noneRow + available.map(ind => `
     <div class="row ${state.indicator === ind.id ? 'on' : ''}" data-id="${ind.id}">
       <div class="ico">${indicatorIcon(ind.id)}</div>
-      <div class="lbl">${ind.label}${(ind.src === "lila" || ind.src === "fsi") ? `<span title="${ind.caption}" style="font-size:0.7rem;color:var(--ink-400);cursor:help;margin-left:2px;">ⓘ</span>` : ""}</div>
-      <div class="unit">${ind.unit}</div>
+      <div class="lbl">${escapeHtml(ind.label)}${(ind.src === "lila" || ind.src === "fsi") ? `<span title="${escapeHtml(ind.caption)}" style="font-size:0.7rem;color:var(--ink-400);cursor:help;margin-left:2px;">ⓘ</span>` : ""}</div>
+      <div class="unit">${escapeHtml(ind.unit)}</div>
       <div class="year">${ind.data_year || ""}</div>
     </div>
   `).join("") + (unavailable.length ? `
     <div style="font-size:0.76rem;color:var(--ink-500);margin-top:8px;padding:0 8px;line-height:1.5;">
-      Tract-only: ${unavailable.map(u => u.label).join(", ")}
+      Tract-only: ${unavailable.map(u => escapeHtml(u.label)).join(", ")}
     </div>
   ` : "");
 
   el.querySelectorAll(".row").forEach(r => {
+    makeKeyboardClickable(r);
+    r.setAttribute("aria-pressed", r.classList.contains("on") ? "true" : "false");
     r.addEventListener("click", () => {
       const id = r.dataset.id;
       state.indicator = id === "__none__" ? null : id;
@@ -546,6 +565,8 @@ function renderIndicatorList() {
       updateLegend();
       updateBreadcrumb();
       renderPalettes();
+      const again = el.querySelector(`.row[data-id="${id}"]`);
+      if (again && document.activeElement === document.body) again.focus();
     });
   });
 }
@@ -589,7 +610,7 @@ function renderOrgList() {
       <label class="row">
         <input type="checkbox" data-id="${id}" ${state.orgFilters.has(id) ? "checked" : ""}/>
         <span class="dot" style="background:${meta.color}"></span>
-        <span class="lbl">${meta.label}</span>
+        <span class="lbl">${escapeHtml(meta.label)}</span>
         <span class="n" title="${n} TNFP · ${g} Giving Matters">${(n + g).toLocaleString()}${n ? ` <span style="color:var(--nfp-green-700);font-weight:600">·${n}</span>` : ""}</span>
       </label>
     `;
@@ -632,7 +653,7 @@ function updateLegend() {
   const ind = INDICATORS.find(i => i.id === state.indicator);
 
   document.getElementById("legend-eyebrow").textContent =
-    ind.src === "acs" ? "Census ACS" : ind.src === "health" ? "CDC PLACES" : "USDA LILA";
+    ({ acs: "Census ACS", health: "CDC PLACES", lila: "USDA LILA", fsi: "Feeding America (modeled)" })[ind.src] || "";
   document.getElementById("legend-name").textContent = ind.label;
   document.getElementById("legend-caption").textContent = ind.caption;
 
@@ -667,6 +688,12 @@ function setupSearch() {
     const q = inp.value.trim().toLowerCase();
     if (!q || q.length < 2) { list.classList.remove("open"); list.innerHTML = ""; return; }
     const results = [];
+    // A 5-digit query is almost always a ZIP: list that ZIP first (tract GEOIDs like 47037015xxx also contain it).
+    let exactZip = null;
+    if (/^\d{5}$/.test(q) && state.data.zipcodes) {
+      exactZip = state.data.zipcodes.features.find(f => String(geoidOf(f, "zip")) === q) || null;
+      if (exactZip) results.push({ kind: "ZIP", title: `ZIP ${q}`, sub: "Nashville MSA", type: "zip", feature: exactZip });
+    }
     if (state.data.partners) {
       for (const f of state.data.partners.features) {
         const p = f.properties;
@@ -698,24 +725,31 @@ function setupSearch() {
     if (results.length < 12 && state.data.zipcodes) {
       for (const f of state.data.zipcodes.features) {
         const gid = geoidOf(f, "zip");
-        if (String(gid).includes(q)) {
+        if (String(gid).includes(q) && f !== exactZip) {
           results.push({ kind: "ZIP", title: `ZIP ${gid}`, sub: "Nashville MSA", type: "zip", feature: f });
           if (results.length >= 14) break;
         }
       }
     }
     list.innerHTML = results.length ? results.map((r, i) => `
-      <div class="item" data-i="${i}">
-        <div><span class="kind">${r.kind}</span><span class="t">${r.title}</span></div>
-        <div class="s">${r.sub || ""}</div>
+      <div class="item" data-i="${i}" role="option">
+        <div><span class="kind">${escapeHtml(r.kind)}</span><span class="t">${escapeHtml(r.title)}</span></div>
+        <div class="s">${escapeHtml(r.sub)}</div>
       </div>
-    `).join("") : `<div class="item" style="color:var(--ink-500);">No matches for "${q}"</div>`;
+    `).join("") : `<div class="item" style="color:var(--ink-500);">No matches for "${escapeHtml(q)}"</div>`;
     list.classList.add("open");
 
     list.querySelectorAll(".item[data-i]").forEach(el => {
+      el.setAttribute("tabindex", "-1");
+      el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
       el.addEventListener("click", () => {
         const r = results[parseInt(el.dataset.i)];
         if (IS_PHONE) applyPanels("hide");
+        // A ZIP picked while viewing tracts (or the reverse) switches geography so its detail can open.
+        if (r.feature && r.type !== state.geo) {
+          const btn = document.querySelector(`#geo-toggle button[data-geo="${r.type}"]`);
+          if (btn) btn.click();
+        }
         if (r.coords) {
           map.flyTo([r.coords[1], r.coords[0]], 14, { duration: 0.6 });
         } else {
@@ -737,7 +771,22 @@ function setupSearch() {
     });
   });
 
-  inp.addEventListener("blur", () => setTimeout(() => list.classList.remove("open"), 150));
+  // Keyboard: Arrow Down/Up move through the results, Enter picks, Escape closes.
+  inp.addEventListener("keydown", e => {
+    const items = [...list.querySelectorAll(".item[data-i]")];
+    if (e.key === "ArrowDown" && items.length) { e.preventDefault(); list.classList.add("open"); items[0].focus(); }
+    if (e.key === "Enter" && items.length) { e.preventDefault(); items[0].click(); }
+    if (e.key === "Escape") list.classList.remove("open");
+  });
+  list.addEventListener("keydown", e => {
+    const items = [...list.querySelectorAll(".item[data-i]")];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" && i < items.length - 1) { e.preventDefault(); items[i + 1].focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); (i > 0 ? items[i - 1] : inp).focus(); }
+    if (e.key === "Escape") { list.classList.remove("open"); inp.focus(); }
+  });
+  inp.addEventListener("blur", () => setTimeout(() => { if (!list.contains(document.activeElement)) list.classList.remove("open"); }, 150));
+  list.addEventListener("focusout", () => setTimeout(() => { if (!list.contains(document.activeElement) && document.activeElement !== inp) list.classList.remove("open"); }, 150));
   inp.addEventListener("focus", () => { if (inp.value) list.classList.add("open"); });
 }
 
@@ -765,11 +814,12 @@ function renderPalettes() {
   const wrap = document.getElementById("palette-swatches");
   if (!wrap) return;
   wrap.innerHTML = PALETTE_META.map(p => `
-    <div class="swatch ${p.id === state.palette ? 'on' : ''}" data-p="${p.id}" title="${p.label}">
+    <div class="swatch ${p.id === state.palette ? 'on' : ''}" data-p="${p.id}" title="${escapeHtml(p.label)}" aria-label="${escapeHtml(p.label)} palette">
       <div class="swatch-bar" style="background: linear-gradient(to right, ${PALETTES[p.id].join(", ")})"></div>
     </div>
   `).join("");
   wrap.querySelectorAll(".swatch").forEach(s => {
+    makeKeyboardClickable(s);
     s.addEventListener("click", () => {
       state.palette = s.dataset.p;
       renderPalettes();
