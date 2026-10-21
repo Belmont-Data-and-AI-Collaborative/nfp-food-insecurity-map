@@ -126,7 +126,7 @@ Both point GeoJSONs use the same property keys (`partner_name`, `partner_type`) 
 
 ## Deployment
 
-Live at **https://tnfpmap.bdaic.ai** (`nfpmap.bdaic.ai` 301-redirects there via CloudFront Function `nfpmap-redirect`): private S3 bucket `nfpmap.bdaic.ai` behind CloudFront `E307ZY8JYGD9DF` (BDAIC AWS account, us-east-1). Moved from Vercel on 2026-10-21. `scripts/deploy.sh` uploads the pages, `map.js`, `styles.css` and logos from the working tree plus the served data from `s3://nfp-food-insecurity-map-data/current/`, then invalidates CloudFront. The Python pipeline is **not** part of a deploy; it runs out of band and the operator uploads its output to the output bucket with `aws s3 sync`.
+Live at **https://tnfpmap.bdaic.ai** (the first name, `nfpmap.bdaic.ai`, was retired 2026-10-21 and no longer resolves; the bucket keeps that name): private S3 bucket `nfpmap.bdaic.ai` behind CloudFront `E307ZY8JYGD9DF` (BDAIC AWS account, us-east-1). Moved from Vercel on 2026-10-21. `scripts/deploy.sh` uploads the pages, `map.js`, `styles.css` and logos from the working tree plus the served data from `s3://nfp-food-insecurity-map-data/current/`, then invalidates CloudFront. The Python pipeline is **not** part of a deploy; it runs out of band and the operator uploads its output to the output bucket with `aws s3 sync`.
 
 **Three buckets, three roles; do not conflate:**
 - `bdaic-public-transform` — SOURCE inputs. Referenced by `s3_bucket:` in [project.yml](project.yml) and `AWS_BUCKET_NAME` in `.env.example`. Pipeline reads only.

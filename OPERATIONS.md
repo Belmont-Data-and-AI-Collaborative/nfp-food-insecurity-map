@@ -18,7 +18,7 @@ For architectural context and invariants, see [CLAUDE.md](CLAUDE.md). For design
 
 There is **no runtime backend**: CloudFront serves only the static HTML/JS and the pre-built `data/` files. The Python pipeline runs out of band; a deploy only copies its published output.
 
-**Production URL:** https://tnfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21; first published as `nfpmap.bdaic.ai`, which now redirects)
+**Production URL:** https://tnfpmap.bdaic.ai (moved from Vercel, `nfp-food-insecurity-map-ecru.vercel.app`, on 2026-10-21; first published as `nfpmap.bdaic.ai`, retired the same day: no DNS, no alias, no redirect)
 
 ---
 
@@ -60,10 +60,10 @@ Used by `scripts/deploy.sh`. Needs `s3:GetObject`/`s3:ListBucket` on `nfp-food-i
 | Piece | Value |
 |---|---|
 | URL | https://tnfpmap.bdaic.ai |
-| Redirect | `nfpmap.bdaic.ai` → 301 → `tnfpmap.bdaic.ai` (same path and query), done by CloudFront Function `nfpmap-redirect` on viewer-request |
+| Old name | `nfpmap.bdaic.ai` retired 2026-10-21: alias, CloudFront Function `nfpmap-redirect`, DNS records and its certificate deleted. Links to it fail to resolve. |
 | CloudFront | `E307ZY8JYGD9DF` (`d1jwmo9cga6oc3.cloudfront.net`): HTTPS only (HTTP redirects), HTTP/2+3, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`; unknown paths return the home page with status 404 |
-| Certificate | ACM `tnfpmap.bdaic.ai` + `nfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
-| DNS | Route 53 A + AAAA aliases for both names → the distribution |
+| Certificate | ACM `tnfpmap.bdaic.ai` (us-east-1), DNS-validated in Route 53, renews automatically |
+| DNS | Route 53 A + AAAA aliases for `tnfpmap.bdaic.ai` → the distribution |
 | Site bucket | `nfpmap.bdaic.ai` (keeps the first name; it's internal), readable only by the distribution |
 | Tags | `Project=nashville_food_project__food_insecurity_mapping_tool`, `Owner`, `Environment=prod`, `Client=tnfp` |
 
