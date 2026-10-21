@@ -47,42 +47,32 @@ Each source also has a `--step` flag: `python -m pipeline --step census_acs` etc
 
 ## Deployment
 
-Deployed on **Vercel** (team `databelmonts-projects`, project `nfp-food-insecurity-map`). Production alias: https://nfp-food-insecurity-map-ecru.vercel.app.
+Live at **https://nfpmap.bdaic.ai**: a private S3 bucket (`nfpmap.bdaic.ai`) behind CloudFront (`E307ZY8JYGD9DF`) in BDAIC's AWS account. Moved from Vercel (`nfp-food-insecurity-map-ecru.vercel.app`) on 2026-10-21; [OPERATIONS.md](OPERATIONS.md) §3 has the details.
 
 ### How it works
 
-The site is pure static HTML/JS. Vercel's build step runs `scripts/sync-data.mjs`, which mirrors the pre-built `data/` folder from S3 into the deploy:
+The site is pure static HTML/JS. `scripts/deploy.sh` uploads the pages, `map.js`, `styles.css` and logos from the repo, plus the pre-built data from `s3://nfp-food-insecurity-map-data/current/`, then clears CloudFront's cache.
 
-```
-Vercel build:
-  npm install @aws-sdk/client-s3
-  node scripts/sync-data.mjs      # pulls s3://nfp-food-insecurity-map-data/current/
-  serve .
-```
+The Python pipeline **does not** run during a deploy. It runs separately (locally or as a scheduled job) and uploads its output to `s3://nfp-food-insecurity-map-data/current/`; the next deploy publishes it.
 
-The Python pipeline **does not** run during the Vercel build — `sync-data.mjs` only mirrors pre-built files. The pipeline runs separately (locally or as a scheduled job) and uploads its output to `s3://nfp-food-insecurity-map-data/current/`.
-
-### S3 buckets (two, on purpose)
+### S3 buckets
 
 | Bucket | Role | Who reads/writes it |
 |---|---|---|
 | `bdaic-public-transform` | Raw SOURCE inputs (Census ACS, CDC PLACES, USDA LILA, partner CSVs) | Pipeline reads. See `s3_bucket:` entries in [project.yml](project.yml). |
-| `nfp-food-insecurity-map-data` | Built OUTPUT served to the website (under `current/` prefix) | Pipeline writes; Vercel build reads. |
+| `nfp-food-insecurity-map-data` | Built OUTPUT (under `current/` prefix) | Pipeline writes; `scripts/deploy.sh` reads. |
+| `nfpmap.bdaic.ai` | The SITE that CloudFront serves | `scripts/deploy.sh` writes; only CloudFront can read. |
 
-The `current/` prefix namespaces the live deploy. Peer prefixes (e.g. `archive/<date>/`, `staging/`) can be added later without disrupting the served files.
+The `current/` prefix namespaces the published data. Peer prefixes (e.g. `archive/<date>/`, `staging/`) can be added later without disrupting the site.
 
 ### Redeploying
 
-- **Data changed only:** upload new files to `s3://nfp-food-insecurity-map-data/current/`, then trigger a Vercel redeploy (dashboard button or `vercel --prod --scope databelmonts-projects`).
-- **Code changed:** `vercel --prod --scope databelmonts-projects` from the repo root. Deploys are **intentionally manual** — GitHub auto-deploy is not wired. Push to `main` first so git matches prod, then run the deploy.
+Deploys are **intentionally manual**: nothing deploys on push. Push to `main` first so git matches production.
 
-### Required Vercel env vars (Production)
+- **Code changed:** `scripts/deploy.sh` from the repo root (`--dry-run` lists what it would upload).
+- **Data changed:** upload the new files to `s3://nfp-food-insecurity-map-data/current/`, then `scripts/deploy.sh`.
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-
-These grant read access to `s3://nfp-food-insecurity-map-data/current/` only; they are not the pipeline's credentials. Set once per environment with `vercel env add <NAME> production --scope databelmonts-projects`.
+You need AWS credentials that can read the data bucket, write the site bucket and create a CloudFront invalidation ([OPERATIONS.md](OPERATIONS.md) §2.2).
 
 ## See also
 
