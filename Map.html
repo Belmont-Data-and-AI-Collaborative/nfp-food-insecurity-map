@@ -367,11 +367,18 @@
       .tweaks-panel { right: 8px; max-width: calc(100% - 16px); }
     }
     @page { size: landscape; margin: 0.5in; }
+    #print-image { display: none; }
     @media print {
-      #sidebar      { display: none !important; }
-      .panel-toggle { display: none !important; }
-      .shell        { display: block; height: 100vh; }
-      .map-wrap     { width: 100% !important; height: 100vh !important; }
+      /* PDF button: only the rendered map image (map.js exportPdf), fitted to the page. */
+      body.printing-image > :not(#print-image) { display: none !important; }
+      body.printing-image #print-image { display: block; width: 100%; height: auto; max-height: 100vh; object-fit: contain; }
+      /* Ctrl/Cmd+P on the page: nav + map fit one page, legend and pins keep their colours. */
+      html, body { height: auto; overflow: visible; }
+      #sidebar, .panel-toggle, .tweaks-toggle, .tweaks-panel, .statusbar, .leaflet-control-zoom { display: none !important; }
+      .topnav .links { display: none; }
+      .shell        { display: block; flex: none; height: calc(100vh - 80px); }   /* flex:1 collapses to 0 once body height is auto */
+      .map-wrap     { width: 100% !important; height: 100% !important; }
+      .legend, .legend *, .leaflet-marker-icon, .leaflet-marker-icon * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>

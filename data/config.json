@@ -155,7 +155,7 @@
       ],
       "palette": "categorical",
       "fmt": "{}",
-      "caption": "USDA designation: tract where \u2265500 residents (or \u226533% of population) live >1 mile from a supermarket AND tract median income \u226480% of area median. Urban thresholds; rural uses 10-mile cutoff. Source: USDA ERS Food Access Research Atlas, 2019.\n",
+      "caption": "USDA designation: a low-income tract (poverty rate \u226520%, or median family income \u226480% of the statewide or metro-area median) where \u2265500 residents or \u226533% of the population live more than 1 mile (urban) or 10 miles (rural) from the nearest supermarket. Source: USDA ERS Food Access Research Atlas, 2019.\n",
       "unit_label": "Low Income + Low Access",
       "default_visible": false,
       "data_year": "2019",
@@ -175,7 +175,7 @@
       ],
       "palette": "teals",
       "fmt": "{:,.0f}",
-      "caption": "Number of residents living more than 1 mile (urban) or 10 miles (rural) from the nearest supermarket, regardless of income level. Source: USDA ERS Food Access Research Atlas, 2019.\n",
+      "caption": "Number of residents living more than 1 mile from the nearest supermarket, regardless of income (USDA's 1-mile measure, applied to urban and rural tracts alike). Source: USDA ERS Food Access Research Atlas, 2019.\n",
       "unit_label": "Population Beyond 1 mi from Supermarket",
       "default_visible": false,
       "data_year": "2019"
@@ -190,7 +190,7 @@
       ],
       "palette": "ambers",
       "fmt": "{:,.0f}",
-      "caption": "Low-income residents (HH income \u226480% of area median) who also live more than 1 mile (urban) or 10 miles (rural) from the nearest supermarket. Source: USDA ERS Food Access Research Atlas, 2019.\n",
+      "caption": "Low-income residents (income at or below 200% of the federal poverty level) who live more than 1 mile from the nearest supermarket. Source: USDA ERS Food Access Research Atlas, 2019.\n",
       "unit_label": "Low Income Pop Beyond 1 mi",
       "default_visible": false,
       "data_year": "2019"

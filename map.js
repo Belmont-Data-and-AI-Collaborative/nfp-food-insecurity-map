@@ -896,9 +896,15 @@ function setupExport() {
         console.error("PNG export failed:", e);
         window.print();
       });
-      else window.print();
+      else exportPdf().catch(e => {
+        console.error("PDF export failed, printing the page instead:", e);
+        window.print();
+      });
     });
   });
+  // Ctrl/Cmd+P on the page itself: let Leaflet re-measure the wider print layout (sidebar hidden).
+  window.addEventListener("beforeprint", () => map.invalidateSize());
+  window.addEventListener("afterprint", () => map.invalidateSize());
 }
 
 function downloadBlob(blob, name) {
@@ -932,7 +938,7 @@ function exportCsv() {
 // PNG of the current map view, drawn onto a canvas from what is on screen: basemap tiles (loaded with
 // crossOrigin), the shaded areas (Leaflet's SVG layer), the markers, plus a title, legend and the
 // basemap attribution. No library, so the CSP needs nothing extra.
-async function exportPng() {
+async function renderMapPng() {
   const el = map.getContainer();
   const box = el.getBoundingClientRect();
   const W = Math.round(box.width), H = Math.round(box.height), FOOT = 30, S = 2;
@@ -1013,8 +1019,33 @@ async function exportPng() {
   const today = new Date().toISOString().slice(0, 10);
   ctx.fillText(`Basemap © OpenStreetMap contributors © CARTO · tnfpmap.bdaic.ai · exported ${today}`, 16, HEAD + H + 19);
 
-  const blob = await new Promise((ok, bad) => canvas.toBlob(b => b ? ok(b) : bad(new Error("canvas is empty")), "image/png"));
-  downloadBlob(blob, `nfp_map_${state.geo}_${state.indicator || "basemap"}.png`);
+  return new Promise((ok, bad) => canvas.toBlob(b => b ? ok(b) : bad(new Error("canvas is empty")), "image/png"));
+}
+
+async function exportPng() {
+  downloadBlob(await renderMapPng(), `nfp_map_${state.geo}_${state.indicator || "basemap"}.png`);
+}
+
+// PDF: print the same image the PNG export draws (title, map, legend, attribution), scaled to one
+// landscape page. Printing the live page instead depends on the browser's print layout and its
+// "background graphics" setting, which cut off or blanked the legend.
+async function exportPdf() {
+  const url = URL.createObjectURL(await renderMapPng());
+  const img = document.createElement("img");
+  img.id = "print-image";
+  img.alt = "TNFP Food Insecurity Map — current view";
+  img.src = url;
+  await img.decode();
+  document.body.appendChild(img);
+  document.body.classList.add("printing-image");
+  const done = () => {
+    document.body.classList.remove("printing-image");
+    img.remove();
+    URL.revokeObjectURL(url);
+    window.removeEventListener("afterprint", done);
+  };
+  window.addEventListener("afterprint", done);
+  window.print();
 }
 
 // ---------- Data loading ----------

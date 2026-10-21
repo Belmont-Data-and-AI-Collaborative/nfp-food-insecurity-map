@@ -44,12 +44,12 @@ class TestLILACaptions:
         return None
 
     def test_4_1_lila_flag_caption_starts_with_usda_designation(self, project_cfg):
-        """AC 4.1: lila_flag caption must begin with 'USDA designation: tract where'."""
+        """AC 4.1: lila_flag caption must begin with 'USDA designation:'."""
         var = self._find_var(project_cfg, "lila_flag")
         assert var is not None, "lila_flag variable not found in project.yml"
         caption = var.get("caption", "")
-        assert caption.strip().startswith("USDA designation: tract where"), (
-            f"lila_flag caption should start with 'USDA designation: tract where…', got:\n{caption!r}"
+        assert caption.strip().startswith("USDA designation:"), (
+            f"lila_flag caption should start with 'USDA designation:', got:\n{caption!r}"
         )
 
     def test_4_1_lila_flag_caption_mentions_supermarket_distance(self, project_cfg):
@@ -61,10 +61,12 @@ class TestLILACaptions:
         )
 
     def test_4_1_lila_flag_caption_mentions_income_threshold(self, project_cfg):
-        """lila_flag caption must mention the 80% income threshold."""
+        """lila_flag caption must give both USDA low-income-tract triggers: poverty >=20% or
+        median family income <=80% of the statewide/metro median (USDA ERS FARA documentation)."""
         var = self._find_var(project_cfg, "lila_flag")
         caption = var.get("caption", "")
-        assert "80%" in caption, "lila_flag caption should mention '80%' income threshold"
+        assert "80%" in caption, "lila_flag caption should mention the 80% median-family-income trigger"
+        assert "20%" in caption, "lila_flag caption should mention the poverty-rate >=20% trigger"
 
     def test_4_1_lila_flag_caption_cites_usda_ers(self, project_cfg):
         """lila_flag caption must cite USDA ERS as the source."""
@@ -82,11 +84,13 @@ class TestLILACaptions:
         )
 
     def test_lalowi1_caption_mentions_low_income_threshold(self, project_cfg):
-        """lalowi1 caption must mention the 80% income threshold."""
+        """lalowi1 counts low-income *individuals*: income at or below 200% of the federal
+        poverty level (USDA ERS FARA) — not the 80%-of-median tract test."""
         var = self._find_var(project_cfg, "lalowi1")
         assert var is not None, "lalowi1 variable not found in project.yml"
         caption = var.get("caption", "")
-        assert "80%" in caption, "lalowi1 caption should mention '80%' income threshold"
+        assert "200%" in caption, "lalowi1 caption should give the 200%-of-poverty threshold"
+        assert "80%" not in caption, "lalowi1 caption should not use the 80%-of-median tract test"
 
 
 # ── AC 6: data_year on every variable ────────────────────────────────────────
