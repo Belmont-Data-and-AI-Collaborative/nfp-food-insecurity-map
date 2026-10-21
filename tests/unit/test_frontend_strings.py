@@ -158,8 +158,8 @@ class TestLILAInfoTooltip:
         assert 'ind.src === "lila"' in MAP_JS
 
     def test_4_4_title_bound_to_caption(self):
-        """AC 4.4: title attribute is bound to ind.caption (tooltip text = caption)."""
-        assert 'title="${ind.caption}"' in MAP_JS
+        """AC 4.4: title attribute is bound to ind.caption (tooltip text = caption), HTML-escaped."""
+        assert 'title="${escapeHtml(ind.caption)}"' in MAP_JS
 
     def test_4_4_cursor_help_style(self):
         """ⓘ icon must have cursor:help so users know it's hoverable."""
