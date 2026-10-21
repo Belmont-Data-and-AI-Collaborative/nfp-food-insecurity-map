@@ -225,7 +225,8 @@ function initMap() {
   L.tileLayer(`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${cartoKey}`, {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: "abcd",
-    maxZoom: 19
+    maxZoom: 19,
+    crossOrigin: true   // CARTO sends CORS headers; lets exportPng() draw the tiles without tainting its canvas
   }).addTo(map);
 
   map.on("zoomend moveend", updateStatus);
@@ -890,37 +891,130 @@ function setupExport() {
     b.addEventListener("click", () => {
       const kind = b.dataset.export;
       if (kind === "csv") exportCsv();
+      else if (kind === "png") exportPng().catch(e => {
+        // e.g. a tile loaded without CORS taints the canvas: fall back to print rather than do nothing.
+        console.error("PNG export failed:", e);
+        window.print();
+      });
       else window.print();
     });
   });
 }
 
-function exportCsv() {
-  const src = state.geo === "tract" ? state.data.tracts : state.data.zipcodes;
-  if (!src) return;
-  const rows = [["geoid", "region", "population", "median_income", "poverty_rate", "diabetes", "hypertension", "obesity", "lila", "low_access_pop"]];
-  for (const f of src.features) {
-    const gid = geoidOf(f, state.geo);
-    rows.push([
-      gid,
-      state.geo === "tract" ? tractCountyName(gid) : "ZIP",
-      valueFor(gid, "total_population") ?? "",
-      valueFor(gid, "median_household_income") ?? "",
-      valueFor(gid, "poverty_rate") ?? "",
-      valueFor(gid, "diabetes") ?? "",
-      valueFor(gid, "hypertension") ?? "",
-      valueFor(gid, "obesity") ?? "",
-      state.geo === "tract" ? (valueFor(gid, "lila_flag") ?? "") : "",
-      state.geo === "tract" ? (valueFor(gid, "lapop1") ?? "") : ""
-    ]);
-  }
-  const blob = new Blob([rows.map(r => r.join(",")).join("\n")], { type: "text/csv" });
+function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `nfp_map_${state.geo}.csv`;
+  a.download = name;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Every indicator available at the current geography, one column each (rounded to 2 decimals).
+function exportCsv() {
+  const src = state.geo === "tract" ? state.data.tracts : state.data.zipcodes;
+  if (!src) return;
+  const inds = INDICATORS.filter(i => i.granularities.includes(state.geo));
+  const cell = v => {
+    if (v == null || v === "") return "";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100);
+    const t = String(v);
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const rows = [["geoid", "region", ...inds.map(i => i.id)]];
+  for (const f of src.features) {
+    const gid = geoidOf(f, state.geo);
+    rows.push([gid, state.geo === "tract" ? tractCountyName(gid) : "ZIP", ...inds.map(i => valueFor(gid, i.id))]);
+  }
+  downloadBlob(new Blob([rows.map(r => r.map(cell).join(",")).join("\n")], { type: "text/csv" }), `nfp_map_${state.geo}.csv`);
+}
+
+// PNG of the current map view, drawn onto a canvas from what is on screen: basemap tiles (loaded with
+// crossOrigin), the shaded areas (Leaflet's SVG layer), the markers, plus a title, legend and the
+// basemap attribution. No library, so the CSP needs nothing extra.
+async function exportPng() {
+  const el = map.getContainer();
+  const box = el.getBoundingClientRect();
+  const W = Math.round(box.width), H = Math.round(box.height), FOOT = 30, S = 2;
+  const NARROW = W < 640;                 // phones: legend goes under the title instead of beside it
+  const HEAD = NARROW ? 124 : 70;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * S; canvas.height = (HEAD + H + FOOT) * S;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(S, S);
+  ctx.fillStyle = "#fbfbf7";
+  ctx.fillRect(0, 0, W, HEAD + H + FOOT);
+  const at = r => [r.left - box.left, r.top - box.top + HEAD];
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, HEAD, W, H); ctx.clip();
+  for (const img of el.querySelectorAll(".leaflet-tile-pane img.leaflet-tile-loaded")) {
+    const r = img.getBoundingClientRect();
+    ctx.drawImage(img, ...at(r), r.width, r.height);
+  }
+  for (const svg of el.querySelectorAll(".leaflet-overlay-pane svg")) {
+    const r = svg.getBoundingClientRect();
+    const clone = svg.cloneNode(true);
+    clone.removeAttribute("style");   // Leaflet positions it with a CSS transform; r already includes it
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.setAttribute("width", r.width); clone.setAttribute("height", r.height);
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+    await img.decode();
+    ctx.drawImage(img, ...at(r), r.width, r.height);
+  }
+  for (const icon of el.querySelectorAll(".leaflet-marker-pane .leaflet-marker-icon")) {
+    const dot = icon.firstElementChild;
+    if (!dot) continue;
+    const r = dot.getBoundingClientRect(), cs = getComputedStyle(dot);
+    const [x, y] = at(r), rad = r.width / 2;
+    ctx.globalAlpha = parseFloat(cs.opacity) || 1;
+    ctx.beginPath(); ctx.arc(x + rad, y + rad, rad, 0, Math.PI * 2);
+    ctx.fillStyle = cs.backgroundColor; ctx.fill();
+    ctx.lineWidth = parseFloat(cs.borderTopWidth) || 0;
+    if (ctx.lineWidth) { ctx.strokeStyle = cs.borderTopColor; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    if (dot.classList.contains("cluster-bubble")) {
+      ctx.fillStyle = cs.color; ctx.font = `600 ${cs.fontSize} Inter, sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(dot.textContent.trim(), x + rad, y + rad + 1);
+    }
+  }
+  ctx.restore();
+
+  // Title, breadcrumb and legend above the map; attribution and date below it.
+  const ind = INDICATORS.find(i => i.id === state.indicator);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#14391a";
+  ctx.font = "600 20px 'Source Serif 4', serif";
+  ctx.fillText("TNFP Food Insecurity Map", 16, 30);
+  ctx.fillStyle = "#5b6359"; ctx.font = "12px Inter, sans-serif";
+  ctx.fillText(document.getElementById("breadcrumb").textContent, 16, 52);
+  if (ind) {
+    const lx = NARROW ? 16 : W - 230, lw = Math.min(200, W - 32), ly = NARROW ? 64 : 0;
+    ctx.fillStyle = "#3d453b"; ctx.font = "500 11px Inter, sans-serif";
+    ctx.fillText(ind.label, lx, ly + 24);
+    if (ind.categorical) {
+      [["#a14b28", "LILA tract"], ["#e3efe4", "Not LILA"]].forEach(([c, t], k) => {
+        ctx.fillStyle = c; ctx.fillRect(lx + k * 100, ly + 34, 12, 12);
+        ctx.fillStyle = "#3d453b"; ctx.fillText(t, lx + k * 100 + 18, ly + 45);
+      });
+    } else {
+      const pal = PALETTES[state.palette] || [];
+      const g = ctx.createLinearGradient(lx, 0, lx + lw, 0);
+      pal.forEach((c, k) => g.addColorStop(pal.length > 1 ? k / (pal.length - 1) : 0, c));
+      ctx.fillStyle = g; ctx.fillRect(lx, ly + 32, lw, 10);
+      const [mn, mx] = indicatorRange(state.indicator);
+      ctx.fillStyle = "#5b6359"; ctx.font = "10px Inter, sans-serif";
+      ctx.fillText(ind.fmt(mn), lx, ly + 56);
+      ctx.textAlign = "right"; ctx.fillText(ind.fmt(mx), lx + lw, ly + 56); ctx.textAlign = "left";
+    }
+  }
+  ctx.fillStyle = "#5b6359"; ctx.font = "10px Inter, sans-serif";
+  const today = new Date().toISOString().slice(0, 10);
+  ctx.fillText(`Basemap © OpenStreetMap contributors © CARTO · tnfpmap.bdaic.ai · exported ${today}`, 16, HEAD + H + 19);
+
+  const blob = await new Promise((ok, bad) => canvas.toBlob(b => b ? ok(b) : bad(new Error("canvas is empty")), "image/png"));
+  downloadBlob(blob, `nfp_map_${state.geo}_${state.indicator || "basemap"}.png`);
 }
 
 // ---------- Data loading ----------

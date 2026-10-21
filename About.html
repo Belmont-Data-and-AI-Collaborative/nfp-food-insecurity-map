@@ -175,7 +175,7 @@
 
       <section id="sources">
         <h2>Data sources</h2>
-        <p>The map harmonizes five datasets at two geographic grains — 2020 Census tracts (434 tracts) and 2020 ZCTAs — clipped to the 14-county Nashville MSA.</p>
+        <p>The map harmonizes six datasets at two geographic grains — 2020 Census tracts (434 tracts) and 2020 ZCTAs — clipped to the 14-county Nashville MSA.</p>
 
         <div class="source-card">
           <div class="src-head">
@@ -198,7 +198,7 @@
             <span class="vintage">CDC PLACES 2024 release</span>
           </div>
           <dl>
-            <dt>Variables</dt><dd>Diabetes prevalence (crude, adults 18+)</dd>
+            <dt>Variables</dt><dd>Diabetes, high blood pressure (<code>BPHIGH</code>) and obesity (BMI ≥ 30) prevalence — crude prevalence, adults 18+</dd>
             <dt>Geography</dt><dd>Census tract — model-based small-area estimates</dd>
             <dt>Method</dt><dd>CDC uses BRFSS responses + ACS covariates to produce tract-level prevalence. These are <em>modeled</em>, not measured.</dd>
             <dt>Caveat</dt><dd>PLACES estimates are a smoothed surface. Do not interpret tract-level differences below ~1 pct point as meaningful.</dd>
@@ -221,6 +221,20 @@
 
         <div class="source-card">
           <div class="src-head">
+            <span class="tag">Feeding America</span>
+            <h3>Map the Meal Gap · Modeled to Census Tracts</h3>
+            <span class="vintage">MMG 2025 method · 2023 data</span>
+          </div>
+          <dl>
+            <dt>Variables</dt><dd>Food insecurity rate (%) and estimated food-insecure residents per tract (rate × tract population)</dd>
+            <dt>Geography</dt><dd>Census tract only — no ZIP view</dd>
+            <dt>Method</dt><dd>Feeding America's county food-insecurity rates, distributed to tracts with the Map the Meal Gap 2025 regression coefficients and ACS predictors. Tract estimates re-aggregate to each county's published rate.</dd>
+            <dt>Caveat</dt><dd>These are <em>modeled</em> estimates. Version 1 uses overall poverty in place of non-student poverty, which can overstate food insecurity in student-heavy tracts.</dd>
+          </dl>
+        </div>
+
+        <div class="source-card">
+          <div class="src-head">
             <span class="tag">CFMT</span>
             <h3>Giving Matters · Nonprofit Registry</h3>
             <span class="vintage">Scraped Feb 2026</span>
@@ -228,7 +242,7 @@
           <dl>
             <dt>Records</dt><dd>1,045 middle-TN nonprofits with addresses and mission statements</dd>
             <dt>Geocoding</dt><dd>Census Geocoder → fallback to Nominatim; 94.2% geocoded successfully</dd>
-            <dt>Classification</dt><dd>Mission statements run through Claude Haiku with a 16-category rubric (see below). Human-spot-checked at n=150.</dd>
+            <dt>Classification</dt><dd>Mission statements classified by an Anthropic Claude model (<code>claude-opus-4-7</code>, <code>scripts/classify_giving_matters.py</code>) with a 16-category rubric (see below).</dd>
             <dt>License</dt><dd>Public registry data · Community Foundation of Middle TN</dd>
           </dl>
         </div>
@@ -302,8 +316,8 @@
           </tbody>
         </table>
         <div class="callout">
-          <strong>Evaluation.</strong> 150 randomly-sampled classifications were human-reviewed in March 2026.
-          Agreement with ground truth: <strong>91.3%</strong>. The most confused pair is <code>community_meals</code> ↔ <code>homeless_outreach</code>,
+          <strong>Evaluation.</strong> 150 randomly-sampled classifications were human-reviewed in March 2026, against the
+          earlier 10-category rubric: <strong>91.3%</strong> agreement. The 16-category rubric (June 2026) has not yet been re-evaluated. The most confused pair is <code>community_meals</code> ↔ <code>homeless_outreach</code>,
           which often overlap in practice.
         </div>
       </section>
