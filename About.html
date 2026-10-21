@@ -217,9 +217,9 @@
             <span class="vintage">Scraped Feb 2026</span>
           </div>
           <dl>
-            <dt>Records</dt><dd>1,487 middle-TN nonprofits with addresses and mission statements</dd>
+            <dt>Records</dt><dd>1,045 middle-TN nonprofits with addresses and mission statements</dd>
             <dt>Geocoding</dt><dd>Census Geocoder → fallback to Nominatim; 94.2% geocoded successfully</dd>
-            <dt>Classification</dt><dd>Mission statements run through Claude Haiku with a 10-category rubric (see below). Human-spot-checked at n=150.</dd>
+            <dt>Classification</dt><dd>Mission statements run through Claude Haiku with a 16-category rubric (see below). Human-spot-checked at n=150.</dd>
             <dt>License</dt><dd>Public registry data · Community Foundation of Middle TN</dd>
           </dl>
         </div>
@@ -231,7 +231,7 @@
             <span class="vintage">Jun 2026 snapshot</span>
           </div>
           <dl>
-            <dt>Records</dt><dd>23 active partner sites with meal-distribution programs</dd>
+            <dt>Records</dt><dd>43 active partner sites with meal-distribution programs</dd>
             <dt>Source</dt><dd>NFP Operations CRM export, geocoded against Census</dd>
             <dt>Fields</dt><dd>Partner name, address, partner type, program type</dd>
           </dl>
@@ -270,7 +270,7 @@
 
       <section id="partner-classification">
         <h2>Partner classification rubric</h2>
-        <p>The 10 categories used for Giving Matters nonprofit classification:</p>
+        <p>The 16 categories used for Giving Matters nonprofit classification:</p>
         <table class="glossary">
           <thead><tr><th>Category</th><th>Definition</th></tr></thead>
           <tbody>
@@ -283,6 +283,12 @@
             <tr><td class="term">workforce_development</td><td>Job training, career counseling, skills education</td></tr>
             <tr><td class="term">after_school</td><td>Out-of-school-time programs for children</td></tr>
             <tr><td class="term">community_meals</td><td>Meal programs, food pantries, community kitchens</td></tr>
+            <tr><td class="term">child_advocacy</td><td>CASA programs, child advocacy centers and child-welfare nonprofits serving children in the court or foster-care system</td></tr>
+            <tr><td class="term">legal_advocacy</td><td>Free or low-cost civil legal services, and policy or advocacy groups on economic justice, housing, food access and related issues</td></tr>
+            <tr><td class="term">veterans_military</td><td>Services, benefits navigation and community support for veterans, active-duty military and their families</td></tr>
+            <tr><td class="term">faith_ministry</td><td>Congregations and faith-based organizations with no clear food, housing, health or other service specialization</td></tr>
+            <tr><td class="term">environment_conservation</td><td>Land trusts, conservation, parks and greenspace groups, sustainability and active-transportation nonprofits</td></tr>
+            <tr><td class="term">higher_education</td><td>Colleges, universities and their foundations (not K–12 schools or tutoring programs)</td></tr>
             <tr><td class="term">other</td><td>Orgs that don't fit the above or ambiguous mission text</td></tr>
           </tbody>
         </table>

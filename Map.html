@@ -152,7 +152,8 @@
       padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--ink-100); font-size: 0.85rem;
     }
     .search-results .item:last-child { border: 0; }
-    .search-results .item:hover { background: var(--nfp-green-50); }
+    .search-results .item:hover, .search-results .item:focus { background: var(--nfp-green-50); outline: none; }
+    #indicator-list .row:focus-visible, .partners-near .p:focus-visible, .swatch:focus-visible { outline: 2px solid var(--nfp-green-600); outline-offset: 1px; }
     .search-results .item .t { font-weight: 500; }
     .search-results .item .s { color: var(--ink-500); font-size: 0.78rem; margin-top: 2px; }
     .search-results .item .kind {
@@ -192,7 +193,7 @@
       display: inline-flex; align-items: center; gap: 6px;
       box-shadow: var(--shadow-sm);
     }
-    .panel-toggle { left: 14px; }
+    .panel-toggle { left: 54px; }   /* clear of Leaflet's zoom buttons (top-left, ~34px wide) */
     .tweaks-toggle { right: 14px; }
     .panel-toggle:hover, .tweaks-toggle:hover { background: var(--ink-50); }
 
